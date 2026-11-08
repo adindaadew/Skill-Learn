@@ -28,7 +28,7 @@ Exam-Skill-Learn/
 - **Aplikasi Mobile**: React Native, Expo, React Navigation (Native Stack & Bottom Tabs), Feather Vector Icons.
 - **Backend API**: Node.js, Express.js, JWT (JSON Web Token), Bcryptjs, CORS.
 - **Database**: MongoDB (Mongoose) + Zero-Config In-Memory Engine Fallback (aplikasi dapat langsung dieksekusi oleh penguji bahkan tanpa perlu instalasi MongoDB lokal).
-- **Desain UI**: Bersih, warna dasar Putih dan Biru (`#2563EB`, `#FFFFFF`, `#F8FAFC`), **tanpa gradasi**, dan **tanpa ikon emoticon**.
+- **Desain UI**: Bersih, warna dasar Putih dan Biru (`#2563EB`, `#FFFFFF`, `#F8FAFC`).
 
 ---
 
@@ -101,6 +101,38 @@ Tersedia akun demo yang langsung siap digunakan tanpa perlu mengetik manual:
 
 ---
 
+## 3. Alur Pengguna (User Flow) Aplikasi
+
+```
+[Mulai]
+   │
+   ▼
+[Halaman Login / Register]
+   │ (Validasi email, password, peran Siswa/Mahasiswa)
+   ▼
+[Berhasil Autentikasi -> JWT Token Disimpan]
+   │
+   ├──────────────────────────────┬──────────────────────────────┐
+   ▼                              ▼                              ▼
+[Halaman Utama / Katalog]    [Halaman Favorit]          [Halaman Riwayat]
+   │ (Filter 4 Kategori &          │ (Materi yang disimpan)        │ (Statistik & Progres %)
+   │  Pencarian Kata Kunci)        │                               │
+   ▼                               ▼                               ▼
+   └───────────────────────────────┴───────────────────────────────┘
+                                   │
+                                   ▼
+                         [Halaman Detail Kursus]
+                                   │
+          ┌────────────────┬───────┴────────┬────────────────┐
+          ▼                ▼                ▼                ▼
+     [Tab Artikel]    [Tab Video]      [Tab Kuis]      [Tab Praktik]
+     (Baca teori)     (Tonton video)   (Jawab soal &    (Skenario kasus &
+                                        skor instan)     submit refleksi)
+                                   │
+                                   ▼
+          [Pembaruan Otomatis ke Riwayat Pembelajaran (25% per Modul)]
+```
+
 ## Halaman & Fitur Aplikasi
 
 | No | Halaman | Web (`/client`) | Mobile (`/mobile`) | Keterangan Fitur |
@@ -114,21 +146,72 @@ Tersedia akun demo yang langsung siap digunakan tanpa perlu mengetik manual:
 
 ---
 
-## Panduan Hosting Gratis ke Vercel
+## Dokumentasi REST API Backend
 
-### Hosting Frontend Web ke Vercel:
-1. Hubungkan repositori GitHub Anda ke akun [Vercel](https://vercel.com).
-2. Pilih folder root: `client`.
-3. Framework Preset: **Vite**.
-4. Masukkan Environment Variable jika backend sudah online:
-   - `VITE_API_URL`: URL backend Anda (misal `https://skilllearn-api.onrender.com/api`).
-5. Klik **Deploy**.
+| Metode | Endpoint | Proteksi Auth | Deskripsi |
+|---|---|---|---|
+| `POST` | `/api/auth/register` | Publik | Registrasi akun baru (Siswa/Mahasiswa) |
+| `POST` | `/api/auth/login` | Publik | Masuk dengan email & password, mengembalikan token JWT |
+| `GET` | `/api/auth/me` | Bearer Token | Mengambil identitas profil pengguna yang sedang login |
+| `GET` | `/api/courses` | Opsional | Mengambil daftar materi (bisa filter `category` dan `search`) |
+| `GET` | `/api/courses/:id` | Opsional | Mengambil detail artikel, video, kuis, dan praktik kursus |
+| `GET` | `/api/courses/meta/categories` | Publik | Statistik jumlah materi per kategori |
+| `GET` | `/api/favorites` | Bearer Token | Daftar materi yang disimpan pengguna |
+| `POST` | `/api/favorites/toggle/:courseId` | Bearer Token | Toggle simpan/hapus materi favorit |
+| `GET` | `/api/history` | Bearer Token | Riwayat aktivitas dan progres belajar pengguna |
+| `GET` | `/api/history/summary` | Bearer Token | Ringkasan statistik (total diakses, selesai, rata-rata skor) |
+| `POST` | `/api/history/update` | Bearer Token | Memperbarui progres modul, kirim kuis, dan kirim latihan |
 
-### Hosting Backend ke Render / Railway:
-1. Buat web service baru dari repositori GitHub di [Render](https://render.com) atau [Railway](https://railway.app).
-2. Set Root Directory: `server`.
-3. Build Command: `npm install`.
-4. Start Command: `npm start`.
-5. Environment Variables:
-   - `MONGODB_URI`: Masukkan URI MongoDB Atlas (gratis dari mongodb.com/cloud/atlas).
-   - `JWT_SECRET`: `skilllearn_secret_key_production`.
+---
+## Struktur Database MongoDB
+
+### A. Koleksi `users`
+| Field | Tipe Data | Deskripsi |
+|---|---|---|
+| `_id` | ObjectId | ID unik pengguna |
+| `name` | String | Nama lengkap pengguna |
+| `email` | String (Unique) | Alamat email terdaftar |
+| `password` | String | Hash kata sandi (Bcryptjs) |
+| `role` | String (Enum) | 'Siswa' \| 'Mahasiswa' \| 'Umum' |
+| `institution`| String | Nama sekolah atau kampus |
+| `createdAt` | Date | Waktu pendaftaran |
+
+### B. Koleksi `courses`
+| Field | Tipe Data | Deskripsi |
+|---|---|---|
+| `_id` | ObjectId | ID unik kursus |
+| `title` | String | Judul materi keterampilan |
+| `slug` | String (Unique) | Slug URL ramah SEO |
+| `category` | String | Pemrograman / Desain Grafis / Digital Marketing / Teknologi |
+| `level` | String | Pemula / Menengah / Lanjutan |
+| `duration` | String | Estimasi durasi (contoh: '60 Menit') |
+| `summary` | String | Ringkasan materi |
+| `instructor` | Object | `{ name, role }` |
+| `article` | Object | `{ title, content, keyTakeaways: [] }` |
+| `video` | Object | `{ title, youtubeUrl, youtubeEmbedId, duration, description }` |
+| `quiz` | Array of Objects| `[{ question, options: [], correctAnswerIndex, explanation }]` |
+| `practice` | Object | `{ title, scenario, tasks: [], submissionGuide }` |
+
+### C. Koleksi `favorites`
+| Field | Tipe Data | Deskripsi |
+|---|---|---|
+| `_id` | ObjectId | ID favorit |
+| `user` | ObjectId (Ref: User) | Pengguna pemilik favorit |
+| `course` | ObjectId (Ref: Course) | Kursus yang ditandai |
+| `createdAt` | Date | Waktu penyimpanan |
+
+### D. Koleksi `learninghistories`
+| Field | Tipe Data | Deskripsi |
+|---|---|---|
+| `_id` | ObjectId | ID riwayat |
+| `user` | ObjectId (Ref: User) | Pengguna terkait |
+| `course` | ObjectId (Ref: Course) | Kursus yang dipelajari |
+| `completedModules` | Object | `{ article: bool, video: bool, quiz: bool, practice: bool }` |
+| `quizScore` | Number | Skor kuis terakhir yang diperoleh (0 - 100) |
+| `practiceNotes` | String | Catatan atau refleksi latihan praktik |
+| `practiceLink` | String | Tautan repositori atau karya |
+| `progressPercent`| Number | Persentase total modul (0% - 100%) |
+| `isCompleted` | Boolean | True jika progress telah mencapai 100% |
+| `lastAccessed` | Date | Waktu terakhir materi dibuka |
+
+---
